@@ -2,8 +2,8 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { logoutAction } from "@/lib/auth";
-import { WheelIcon, HomeIcon, UsersIcon } from "@/components/Icons";
 
 interface HeaderProps {
   user: {
@@ -63,7 +63,7 @@ export default function Header({ user }: HeaderProps) {
             gap: "0.5rem" 
           }}
         >
-          <WheelIcon className="w-6 h-6" style={{ color: "#ec4899" }} /> Lucky Wheel Hub
+          <Image src="/wheel-logo.jpg" alt="Lucky Wheel Hub" width={34} height={34} priority style={{ borderRadius: "50%", objectFit: "cover", boxShadow: "0 0 12px rgba(59, 130, 246, 0.5)" }} /> Lucky Wheel Hub
         </Link>
 
         {/* Navigation Items */}
@@ -85,27 +85,7 @@ export default function Header({ user }: HeaderProps) {
             onMouseEnter={() => setShowDropdown(true)}
             onMouseLeave={() => setShowDropdown(false)}
           >
-            {/* Avatar Circle */}
-            <div 
-              style={{ 
-                width: "36px", 
-                height: "36px", 
-                borderRadius: "50%", 
-                background: "linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%)", 
-                color: "#ffffff", 
-                display: "flex", 
-                alignItems: "center", 
-                justifyContent: "center", 
-                fontWeight: "700", 
-                fontSize: "1rem", 
-                cursor: "pointer",
-                boxShadow: "0 0 10px rgba(139, 92, 246, 0.4)",
-                textTransform: "uppercase",
-                userSelect: "none"
-              }}
-            >
-              {user.username.charAt(0)}
-            </div>
+            <div aria-label={`Tài khoản ${user.username}`} style={{ width: "36px", height: "36px", borderRadius: "50%", background: "linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%)", color: "#fff", display: "grid", placeItems: "center", fontWeight: 700, cursor: "pointer", textTransform: "uppercase", boxShadow: "0 0 10px rgba(139, 92, 246, 0.4)" }}>{user.username.charAt(0)}</div>
 
             {/* Hover Dropdown Menu */}
             {showDropdown && (

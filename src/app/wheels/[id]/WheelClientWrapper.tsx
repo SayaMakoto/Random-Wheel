@@ -215,7 +215,7 @@ export default function WheelClientWrapper({
           <Link href={isAdminView ? "/admin/wheels" : "/"} className="btn btn-secondary" style={{ padding: "0.45rem 0.7rem", fontSize: "0.8rem" }}>
             <ArrowLeftIcon className="w-4 h-4" /> Quay về
           </Link>
-          <h1 style={{ fontSize: "2.2rem", fontWeight: "800" }}>{wheelConfig.wheelName}</h1>
+          <h1 style={{ fontSize: "clamp(2.4rem, 3vw, 3.25rem)", fontWeight: "800", lineHeight: 1.1 }}>{wheelConfig.wheelName}</h1>
           <span style={{ width: "91px" }} aria-hidden="true" />
         </div>
       </div>

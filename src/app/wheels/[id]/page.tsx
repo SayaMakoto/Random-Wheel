@@ -50,7 +50,7 @@ export default async function WheelDetailPage({ params }: PageProps) {
   const isOwnerOrAdmin = user && (user.id === wheel.userId || user.role === "admin");
 
   return (
-    <div className="app-container">
+    <div className="app-container wheel-detail-container">
       {/* Header breadcrumb */}
       <Header user={user} />
 
