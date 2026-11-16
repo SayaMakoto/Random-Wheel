@@ -1,7 +1,7 @@
 "use server";
 
 import { db } from "@/lib/db";
-import { getCurrentUser } from "@/lib/auth";
+import { getAdminUser } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 
 function getWheelSaveError(error: unknown) {
@@ -20,7 +20,7 @@ export async function createWheelAction(
   isPublic = true,
   backgroundImage?: string | null
 ) {
-  const user = await getCurrentUser();
+  const user = await getAdminUser();
   if (!user || user.role !== "admin") {
     return { error: "Bạn không có quyền thực hiện hành động này." };
   }
@@ -63,7 +63,7 @@ export async function updateWheelAction(
   hideOnWin?: boolean,
   backgroundImage?: string | null
 ) {
-  const user = await getCurrentUser();
+  const user = await getAdminUser();
   if (!user || user.role !== "admin") {
     return { error: "Bạn không có quyền thực hiện hành động này." };
   }
@@ -92,7 +92,7 @@ export async function updateWheelAction(
 
 // Soft delete (move to trash bin)
 export async function softDeleteWheelAction(id: string) {
-  const user = await getCurrentUser();
+  const user = await getAdminUser();
   if (!user || user.role !== "admin") {
     return { error: "Bạn không có quyền thực hiện hành động này." };
   }
@@ -114,7 +114,7 @@ export async function softDeleteWheelAction(id: string) {
 
 // Restore from trash bin
 export async function restoreWheelAction(id: string) {
-  const user = await getCurrentUser();
+  const user = await getAdminUser();
   if (!user || user.role !== "admin") {
     return { error: "Bạn không có quyền thực hiện hành động này." };
   }
@@ -136,7 +136,7 @@ export async function restoreWheelAction(id: string) {
 
 // Permanent delete
 export async function hardDeleteWheelAction(id: string) {
-  const user = await getCurrentUser();
+  const user = await getAdminUser();
   if (!user || user.role !== "admin") {
     return { error: "Bạn không có quyền thực hiện hành động này." };
   }
@@ -155,7 +155,7 @@ export async function hardDeleteWheelAction(id: string) {
 
 // Update a user's role (admin toggle)
 export async function updateUserRoleAction(userId: string, newRole: string) {
-  const user = await getCurrentUser();
+  const user = await getAdminUser();
   if (!user || user.role !== "admin") {
     return { error: "Bạn không có quyền thực hiện hành động này." };
   }
@@ -181,7 +181,7 @@ export async function updateUserRoleAction(userId: string, newRole: string) {
 }
 
 export async function setUserBlacklistAction(userId: string, isBanned: boolean) {
-  const admin = await getCurrentUser();
+  const admin = await getAdminUser();
   if (!admin || admin.role !== "admin") return { error: "Bạn không có quyền thực hiện hành động này." };
   if (admin.id === userId) return { error: "Bạn không thể đưa chính mình vào danh sách đen." };
 
@@ -199,7 +199,7 @@ export async function setUserBlacklistAction(userId: string, isBanned: boolean) 
 }
 
 export async function deleteBlacklistedUserAction(userId: string) {
-  const admin = await getCurrentUser();
+  const admin = await getAdminUser();
   if (!admin || admin.role !== "admin") return { error: "Bạn không có quyền thực hiện hành động này." };
   if (admin.id === userId) return { error: "Bạn không thể xóa tài khoản của chính mình." };
 
@@ -219,7 +219,7 @@ export async function deleteBlacklistedUserAction(userId: string) {
 }
 
 export async function createSpinCodeAction(code: string, amount: number) {
-  const user = await getCurrentUser();
+  const user = await getAdminUser();
   const normalized = code.trim().toUpperCase();
   if (!user || user.role !== "admin") return { error: "Bạn không có quyền thực hiện hành động này." };
   if (!/^[A-Z0-9]{1,10}$/.test(normalized)) return { error: "Mã quay chỉ gồm chữ/số, tối đa 10 ký tự." };
@@ -229,7 +229,7 @@ export async function createSpinCodeAction(code: string, amount: number) {
 }
 
 export async function deleteSpinCodeAction(id: string) {
-  const user = await getCurrentUser();
+  const user = await getAdminUser();
   if (!user || user.role !== "admin") return { error: "Bạn không có quyền thực hiện hành động này." };
   try { await db.spinCode.delete({ where: { id } }); revalidatePath("/admin/spin-codes"); return { success: true }; }
   catch { return { error: "Không thể xóa mã quay." }; }

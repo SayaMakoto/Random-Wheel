@@ -1,6 +1,7 @@
 import React from "react";
 import { db } from "@/lib/db";
 import { ChartBarIcon, ArrowPathIcon } from "@/components/Icons";
+import { parseSpinResult } from "@/lib/spin-history";
 
 export const metadata = {
   title: "Thống kê hệ thống - Bảng quản trị",
@@ -65,6 +66,7 @@ export default async function AdminDashboardPage() {
             {recentSpins.map((spin) => {
               const date = new Date(spin.createdAt);
               const time = date.toLocaleString("vi-VN", { hour12: false });
+              const parsedResult = parseSpinResult(spin.resultLabel, spin.user?.username || "Khách");
               return (
                 <div 
                   key={spin.id}
@@ -79,8 +81,8 @@ export default async function AdminDashboardPage() {
                   }}
                 >
                   <div style={{ fontSize: "0.9rem" }}>
-                    Người chơi <strong style={{ color: "#a78bfa" }}>{spin.user?.username || "Khách"}</strong> vừa quay trúng 
-                    <strong style={{ color: "#10b981" }}> {spin.resultLabel} </strong> 
+                    Người chơi <strong style={{ color: "#a78bfa" }}>{parsedResult.participant}</strong> vừa quay trúng 
+                    <strong style={{ color: "#10b981" }}> {parsedResult.prize} </strong> 
                     trên vòng quay <span style={{ color: "#ec4899" }}>"{spin.wheel.name}"</span>
                   </div>
                   <span style={{ fontSize: "0.75rem", color: "#6b7280" }}>{time}</span>

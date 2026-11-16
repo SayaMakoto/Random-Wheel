@@ -9,7 +9,7 @@ export default function LoginPage() {
   const [state, formAction, isPending] = useActionState(loginAction, null);
 
   React.useEffect(() => {
-    document.title = "Đăng nhập - Lucky Wheel Hub";
+    document.title = "Đăng nhập Thành viên - Lucky Wheel Hub";
   }, []);
 
   return (
@@ -26,7 +26,7 @@ export default function LoginPage() {
         <h2 
           style={{ 
             textAlign: "center", 
-            marginBottom: "1.5rem", 
+            marginBottom: "0.5rem", 
             fontSize: "1.75rem",
             fontWeight: "800",
             background: "linear-gradient(135deg, #a78bfa 0%, #ec4899 100%)",
@@ -34,8 +34,11 @@ export default function LoginPage() {
             WebkitTextFillColor: "transparent"
           }}
         >
-          Đăng Nhập Hệ Thống
+          Đăng Nhập Thành Viên
         </h2>
+        <p style={{ textAlign: "center", fontSize: "0.82rem", color: "#9ca3af", marginBottom: "1.5rem" }}>
+          Đăng nhập tài khoản để nhận lượt quay và tham gia các vòng quay.
+        </p>
 
         <form action={formAction} style={{ display: "flex", flexDirection: "column", gap: "1.2rem" }}>
           <div>
@@ -76,7 +79,7 @@ export default function LoginPage() {
             disabled={isPending} 
             style={{ marginTop: "0.5rem", width: "100%" }}
           >
-            {isPending ? "Đang xử lý..." : "Đăng nhập"}
+            {isPending ? "Đang xử lý..." : "Đăng nhập Thành viên"}
           </button>
         </form>
 

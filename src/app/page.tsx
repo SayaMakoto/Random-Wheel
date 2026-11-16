@@ -1,7 +1,7 @@
 import React from "react";
 import Link from "next/link";
 import { db } from "@/lib/db";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, getAdminUser } from "@/lib/auth";
 import { WheelIcon } from "@/components/Icons";
 import Header from "@/components/Header";
 
@@ -65,7 +65,7 @@ async function seedDefaultWheels(adminId: string) {
 }
 
 export default async function HomePage({ searchParams }: PageProps) {
-  const user = await getCurrentUser();
+  const user = (await getCurrentUser()) || (await getAdminUser());
   
   // Seed default wheels under admin if none exist
   if (user) {
@@ -163,9 +163,6 @@ export default async function HomePage({ searchParams }: PageProps) {
                 >
                   <div>
                     <h3 style={{ fontSize: "1.1rem", fontWeight: "700", marginBottom: "0.5rem" }}>{wheel.name}</h3>
-                    <p style={{ fontSize: "0.8rem", color: "#9ca3af", marginBottom: "1rem" }}>
-                      Tạo bởi: <strong style={{ color: "#a78bfa" }}>{wheel.user.username}</strong>
-                    </p>
                     <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1.5rem" }}>
                       <span style={{ background: "rgba(139, 92, 246, 0.15)", color: "#c084fc", fontSize: "0.75rem", padding: "0.2rem 0.5rem", borderRadius: "4px" }}>
                         🎯 {sliceCount} ô kích hoạt

@@ -8,7 +8,9 @@ import { redirect } from "next/navigation";
 
 const JWT_SECRET = process.env.JWT_SECRET || "secret-jwt-key-lucky-wheel-12345";
 const key = new TextEncoder().encode(JWT_SECRET);
-const COOKIE_NAME = "session-token";
+
+const USER_COOKIE_NAME = "session-token";
+const ADMIN_COOKIE_NAME = "admin_session_token";
 
 export async function hashPassword(password: string): Promise<string> {
   return bcrypt.hash(password, 10);
@@ -22,7 +24,7 @@ export async function signToken(payload: { userId: string; role: string; usernam
   return new SignJWT(payload)
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
-    .setExpirationTime("2h")
+    .setExpirationTime("8h")
     .sign(key);
 }
 
@@ -32,16 +34,21 @@ export async function verifyToken(token: string) {
       algorithms: ["HS256"],
     });
     return payload;
-  } catch (err) {
+  } catch {
     return null;
   }
 }
 
-// Seed admin user helper
+// In-memory cache flag to avoid querying the DB on every single request
+let adminSeeded = false;
+
+// Seed admin user helper (runs at most once per server process)
 async function ensureAdminSeeded() {
+  if (adminSeeded) return;
   try {
     const adminExists = await db.user.findUnique({
       where: { username: "admin" },
+      select: { id: true },
     });
     if (!adminExists) {
       const hashedPassword = await hashPassword("admin");
@@ -57,16 +64,17 @@ async function ensureAdminSeeded() {
       });
       console.log("Default admin seeded: admin / admin");
     }
-  } catch (e) {
+    adminSeeded = true;
+  } catch {
     // Catch parallel write collisions silently
   }
 }
 
-// Retrieve the current logged-in user
+// Retrieve the current regular logged-in user (from user session)
 export async function getCurrentUser() {
   await ensureAdminSeeded();
   const cookieStore = await cookies();
-  const token = cookieStore.get(COOKIE_NAME)?.value;
+  const token = cookieStore.get(USER_COOKIE_NAME)?.value;
   if (!token) return null;
 
   const payload = await verifyToken(token);
@@ -77,14 +85,36 @@ export async function getCurrentUser() {
       where: { id: payload.userId as string },
       select: { id: true, username: true, email: true, role: true, isBanned: true },
     });
-    // A blocked account cannot keep using an old session token.
+    // A blocked account cannot keep using an active session
     return user?.isBanned ? null : user;
-  } catch (e) {
+  } catch {
     return null;
   }
 }
 
-// Register Server Action
+// Retrieve the current logged-in Administrator (from dedicated admin session)
+export async function getAdminUser() {
+  await ensureAdminSeeded();
+  const cookieStore = await cookies();
+  const token = cookieStore.get(ADMIN_COOKIE_NAME)?.value;
+  if (!token) return null;
+
+  const payload = await verifyToken(token);
+  if (!payload || payload.role !== "admin") return null;
+
+  try {
+    const user = await db.user.findUnique({
+      where: { id: payload.userId as string },
+      select: { id: true, username: true, email: true, role: true, isBanned: true },
+    });
+    if (!user || user.role !== "admin" || user.isBanned) return null;
+    return user;
+  } catch {
+    return null;
+  }
+}
+
+// Register Server Action (Members)
 export async function registerAction(prevState: any, formData: FormData) {
   const username = formData.get("username") as string;
   const email = formData.get("email") as string;
@@ -95,7 +125,6 @@ export async function registerAction(prevState: any, formData: FormData) {
   }
 
   try {
-    // Check if user exists
     const existingUser = await db.user.findFirst({
       where: {
         OR: [{ username }, { email }],
@@ -116,7 +145,6 @@ export async function registerAction(prevState: any, formData: FormData) {
       },
     });
 
-    // Create session token
     const token = await signToken({
       userId: user.id,
       role: user.role,
@@ -124,23 +152,23 @@ export async function registerAction(prevState: any, formData: FormData) {
     });
 
     const cookieStore = await cookies();
-    cookieStore.set(COOKIE_NAME, token, {
+    cookieStore.set(USER_COOKIE_NAME, token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       maxAge: 60 * 60 * 2, // 2 hours
       path: "/",
     });
-  } catch (e) {
+  } catch {
     return { error: "Đã xảy ra lỗi hệ thống khi đăng ký." };
   }
 
   redirect("/");
 }
 
-// Login Server Action
+// Login Server Action (Members)
 export async function loginAction(prevState: any, formData: FormData) {
   await ensureAdminSeeded();
-  
+
   const usernameOrEmail = formData.get("usernameOrEmail") as string;
   const password = formData.get("password") as string;
 
@@ -148,14 +176,12 @@ export async function loginAction(prevState: any, formData: FormData) {
     return { error: "Vui lòng nhập tên đăng nhập và mật khẩu." };
   }
 
-  let isAdmin = false;
-
   try {
     const user = await db.user.findFirst({
       where: {
         OR: [
           { username: usernameOrEmail },
-          { email: usernameOrEmail }
+          { email: usernameOrEmail },
         ],
       },
     });
@@ -173,7 +199,66 @@ export async function loginAction(prevState: any, formData: FormData) {
       return { error: "Tên đăng nhập hoặc mật khẩu không chính xác." };
     }
 
-    isAdmin = user.role === "admin";
+    const token = await signToken({
+      userId: user.id,
+      role: user.role,
+      username: user.username,
+    });
+
+    const cookieStore = await cookies();
+    cookieStore.set(USER_COOKIE_NAME, token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 60 * 60 * 2, // 2 hours
+      path: "/",
+    });
+  } catch {
+    return { error: "Đã xảy ra lỗi hệ thống khi đăng nhập." };
+  }
+
+  redirect("/");
+}
+
+// Logout Server Action (Members)
+export async function logoutAction() {
+  const cookieStore = await cookies();
+  cookieStore.delete(USER_COOKIE_NAME);
+  redirect("/login");
+}
+
+// Dedicated Admin Login Server Action
+export async function adminLoginAction(prevState: any, formData: FormData) {
+  await ensureAdminSeeded();
+
+  const usernameOrEmail = formData.get("usernameOrEmail") as string;
+  const password = formData.get("password") as string;
+
+  if (!usernameOrEmail || !password) {
+    return { error: "Vui lòng nhập tên đăng nhập và mật khẩu quản trị." };
+  }
+
+  try {
+    const user = await db.user.findFirst({
+      where: {
+        OR: [
+          { username: usernameOrEmail },
+          { email: usernameOrEmail },
+        ],
+      },
+    });
+
+    if (!user || user.role !== "admin") {
+      return { error: "Thông tin không chính xác hoặc tài khoản không có quyền quản trị viên." };
+    }
+
+    if (user.isBanned) {
+      return { error: "Tài khoản quản trị này đã bị khóa." };
+    }
+
+    const passwordMatch = await comparePassword(password, user.password);
+    if (!passwordMatch) {
+      return { error: "Thông tin không chính xác hoặc tài khoản không có quyền quản trị viên." };
+    }
 
     const token = await signToken({
       userId: user.id,
@@ -182,26 +267,22 @@ export async function loginAction(prevState: any, formData: FormData) {
     });
 
     const cookieStore = await cookies();
-    cookieStore.set(COOKIE_NAME, token, {
+    cookieStore.set(ADMIN_COOKIE_NAME, token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      maxAge: 60 * 60 * 2, // 2 hours
+      maxAge: 60 * 60 * 8, // 8 hours for admin
       path: "/",
     });
-  } catch (e) {
-    return { error: "Đã xảy ra lỗi hệ thống khi đăng nhập." };
+  } catch {
+    return { error: "Đã xảy ra lỗi hệ thống khi đăng nhập quản trị." };
   }
 
-  if (isAdmin) {
-    redirect("/admin");
-  } else {
-    redirect("/");
-  }
+  redirect("/admin");
 }
 
-// Logout Server Action
-export async function logoutAction() {
+// Dedicated Admin Logout Server Action
+export async function adminLogoutAction() {
   const cookieStore = await cookies();
-  cookieStore.delete(COOKIE_NAME);
-  redirect("/login");
+  cookieStore.delete(ADMIN_COOKIE_NAME);
+  redirect("/admin/login");
 }

@@ -15,9 +15,9 @@ interface LuckyWheelProps {
   isSpinning: boolean;
   onSpinComplete: (item: WheelItem) => void;
   onSpinStart: () => void;
-  triggerSpinSignal: boolean; // Toggle to start spin
+  triggerSpinSignal: boolean;
   setTriggerSpinSignal: (val: boolean) => void;
-  customWinningIndex: number | null; // Set by host to manipulate result
+  customWinningIndex: number | null;
   large?: boolean;
   canSpin?: boolean;
   onSpinRequest?: () => void;
@@ -72,7 +72,7 @@ export default function LuckyWheel({
 
       osc.start();
       osc.stop(ctx.currentTime + 0.04);
-    } catch (e) {
+    } catch {
       // Audio context might be blocked or failed
     }
   };
@@ -87,16 +87,11 @@ export default function LuckyWheel({
     const startTimestamp = performance.now();
     const startAngle = angle % 360;
 
-    // Standard slices: calculate arc size
     const sliceAngle = 360 / activeItems.length;
 
     // Target stop angle calculation
-    // The pointer is at the top (90 degrees in standard Canvas, which is 270 degrees)
-    // We want the winning slice to align with the top pointer (270 deg)
-    // Formula: (270 - sliceCenterAngle) % 360
-    const targetSliceCenter = (winningIndex * sliceAngle) + (sliceAngle / 2);
-    
-    // We add multiple full rotations (e.g. 5 full spins = 1800 deg)
+    // Pointer is at the top (270 degrees in canvas coordinates)
+    const targetSliceCenter = winningIndex * sliceAngle + sliceAngle / 2;
     const extraSpins = 6 * 360;
     const targetAngle = extraSpins + (270 - targetSliceCenter);
     const totalRotation = targetAngle - startAngle;
@@ -114,14 +109,12 @@ export default function LuckyWheel({
       setAngle(currentAngle);
 
       // Calculate current slice at pointer for tick sounds
-      // Pointer is at 270 degrees
-      const normalizedAngle = (currentAngle % 360 + 360) % 360;
+      const normalizedAngle = ((currentAngle % 360) + 360) % 360;
       const pointerAngle = (270 - normalizedAngle + 360) % 360;
       const currentSegment = Math.floor(pointerAngle / sliceAngle) % activeItems.length;
 
       if (currentSegment !== lastTickSegmentRef.current && progress < 0.99) {
         lastTickSegmentRef.current = currentSegment;
-        // Pitch goes down slightly as wheel slows
         const pitch = 700 + (1 - progress) * 300;
         playTickSound(pitch);
       }
@@ -142,15 +135,14 @@ export default function LuckyWheel({
   useEffect(() => {
     if (triggerSpinSignal && !isSpinning && activeItems.length > 0) {
       initAudio();
-      
-      // Determine winner based on probability weights
+
       let chosenIndex = 0;
       if (customWinningIndex !== null && customWinningIndex >= 0 && customWinningIndex < activeItems.length) {
         chosenIndex = customWinningIndex;
       } else {
         const totalWeight = activeItems.reduce((acc, item) => acc + item.weight, 0);
         let randomVal = Math.random() * totalWeight;
-        
+
         for (let i = 0; i < activeItems.length; i++) {
           randomVal -= activeItems[i].weight;
           if (randomVal <= 0) {
@@ -192,13 +184,12 @@ export default function LuckyWheel({
     const height = rect.height;
     const centerX = width / 2;
     const centerY = height / 2;
-    const radius = Math.min(centerX, centerY) - 20;
+    const radius = Math.min(centerX, centerY) - 24;
 
     // Clear background
     ctx.clearRect(0, 0, width, height);
 
     if (activeItems.length === 0) {
-      // Draw placeholder
       ctx.beginPath();
       ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
       ctx.fillStyle = "rgba(255, 255, 255, 0.05)";
@@ -216,148 +207,181 @@ export default function LuckyWheel({
     const sliceAngle = (2 * Math.PI) / activeItems.length;
     const radAngle = (angle * Math.PI) / 180;
 
-    // 1. Draw Shadow Glow behind the wheel
+    const rimWidth = 24;
+    const innerRadius = radius - rimWidth;
+
+    // 1. Festive outer shadow glow
     ctx.save();
-    ctx.shadowBlur = 30;
-    ctx.shadowColor = "rgba(139, 92, 246, 0.25)";
+    ctx.shadowBlur = 24;
+    ctx.shadowColor = "rgba(220, 38, 38, 0.35)";
     ctx.beginPath();
     ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
-    ctx.fillStyle = "#0c0d14";
+    ctx.fillStyle = "#b91c1c";
     ctx.fill();
     ctx.restore();
 
-    // 2. Draw Slices
+    // 2. Draw Slices inside innerRadius (Alternating Red and White)
     activeItems.forEach((item, i) => {
       const startAngle = i * sliceAngle + radAngle;
       const endAngle = startAngle + sliceAngle;
 
-      // Slice sector
+      const isEven = i % 2 === 0;
+      const sliceBg = isEven ? "#dc2626" : "#ffffff";
+      const textColor = isEven ? "#ffffff" : "#b91c1c";
+
       ctx.beginPath();
       ctx.moveTo(centerX, centerY);
-      ctx.arc(centerX, centerY, radius, startAngle, endAngle);
+      ctx.arc(centerX, centerY, innerRadius, startAngle, endAngle);
       ctx.closePath();
-      const sliceGradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, radius);
-      sliceGradient.addColorStop(0, "rgba(255, 255, 255, 0.24)");
-      sliceGradient.addColorStop(0.12, item.color);
-      sliceGradient.addColorStop(1, item.color);
-      ctx.fillStyle = sliceGradient;
+      ctx.fillStyle = sliceBg;
       ctx.fill();
 
-      // Divider lines
-      ctx.strokeStyle = "rgba(11, 15, 25, 0.6)";
-      ctx.lineWidth = 1.5;
+      // Divider lines (golden yellow)
+      ctx.strokeStyle = "#facc15";
+      ctx.lineWidth = 2.5;
       ctx.stroke();
 
-      // Slice Text labels
+      // Slice Text labels (aligned radially along each spoke)
       ctx.save();
       ctx.translate(centerX, centerY);
       ctx.rotate(startAngle + sliceAngle / 2);
-      ctx.fillStyle = "#ffffff";
-      // Text shadow for readability
-      ctx.shadowBlur = 4;
-      ctx.shadowColor = "rgba(0, 0, 0, 0.6)";
-      
-      // Responsive dynamic font sizing based on slice count
-      const fontSize = activeItems.length > 15 ? 11 : activeItems.length > 10 ? 14 : 17;
-      ctx.font = `bold ${fontSize}px var(--font-sans)`;
+      ctx.fillStyle = textColor;
+      if (isEven) {
+        ctx.shadowBlur = 2;
+        ctx.shadowColor = "rgba(0, 0, 0, 0.4)";
+      } else {
+        ctx.shadowBlur = 0;
+      }
+
+      const fontSize = activeItems.length > 16 ? 11 : activeItems.length > 10 ? 13 : 15;
+      ctx.font = `900 ${fontSize}px sans-serif`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
 
-      // Truncate text if it's too long
       let text = item.label;
       if (text.length > 18) {
         text = text.substring(0, 16) + "..";
       }
 
-      ctx.fillText(text, radius * 0.58, 0);
+      ctx.fillText(text, innerRadius * 0.58, 0);
       ctx.restore();
     });
 
-    // 3. Draw clean outer frame; the moving neon outline is rendered as a CSS layer.
+    // 3. Draw Outer Festive Rim with Golden Bulbs
     ctx.beginPath();
     ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
-    ctx.strokeStyle = "rgba(15, 23, 42, 0.94)";
-    ctx.lineWidth = 14;
+    ctx.strokeStyle = "#ca8a04";
+    ctx.lineWidth = 3.5;
     ctx.stroke();
 
-    // 4. Draw the multi-layer center hub.
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, innerRadius, 0, 2 * Math.PI);
+    ctx.strokeStyle = "#ca8a04";
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+
+    // Golden light bulbs around the rim
+    const numBulbs = 24;
+    for (let b = 0; b < numBulbs; b++) {
+      const bAngle = (b * 2 * Math.PI) / numBulbs;
+      const bulbRadius = radius - rimWidth / 2;
+      const bx = centerX + bulbRadius * Math.cos(bAngle);
+      const by = centerY + bulbRadius * Math.sin(bAngle);
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(bx, by, 3.8, 0, 2 * Math.PI);
+      const isLit = b % 2 === Math.floor(angle / 10) % 2;
+      ctx.fillStyle = isLit ? "#fef08a" : "#f59e0b";
+      ctx.shadowBlur = isLit ? 10 : 3;
+      ctx.shadowColor = "#fde047";
+      ctx.fill();
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 0.5;
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // 4. Draw Golden Center Hub with "QUAY"
+    const hubRadius = 42;
     ctx.save();
     ctx.beginPath();
-    ctx.arc(centerX, centerY, 43, 0, 2 * Math.PI);
-    const outerHubGradient = ctx.createRadialGradient(centerX - 12, centerY - 12, 2, centerX, centerY, 43);
-    outerHubGradient.addColorStop(0, "#f5d0fe");
-    outerHubGradient.addColorStop(0.22, "#e879f9");
-    outerHubGradient.addColorStop(0.58, "#7c3aed");
-    outerHubGradient.addColorStop(1, "#2e1065");
-    ctx.fillStyle = outerHubGradient;
-    ctx.shadowBlur = 24;
-    ctx.shadowColor = "rgba(217, 70, 239, 0.7)";
+    ctx.arc(centerX, centerY, hubRadius, 0, 2 * Math.PI);
+    const hubGrad = ctx.createRadialGradient(centerX - 10, centerY - 10, 2, centerX, centerY, hubRadius);
+    hubGrad.addColorStop(0, "#fef9c3");
+    hubGrad.addColorStop(0.35, "#facc15");
+    hubGrad.addColorStop(0.8, "#eab308");
+    hubGrad.addColorStop(1, "#ca8a04");
+    ctx.fillStyle = hubGrad;
+    ctx.shadowBlur = 16;
+    ctx.shadowColor = "rgba(202, 138, 4, 0.6)";
     ctx.fill();
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.8)";
+
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, hubRadius - 3.5, 0, 2 * Math.PI);
+    ctx.strokeStyle = "#b45309";
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    ctx.fillStyle = "#7f1d1d";
+    ctx.shadowBlur = 0;
+    ctx.font = "900 16px sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("QUAY", centerX, centerY);
+    ctx.restore();
+
+    // 5. Draw Top Golden Teardrop Pointer Pin with Red Jewel
+    ctx.save();
+    const pinTipY = centerY - innerRadius + 14;
+    const pinCenterY = centerY - radius - 2;
+
+    ctx.beginPath();
+    ctx.moveTo(centerX, pinTipY);
+    ctx.lineTo(centerX - 14, pinCenterY);
+    ctx.arc(centerX, pinCenterY, 14, Math.PI, 0, false);
+    ctx.lineTo(centerX, pinTipY);
+    ctx.closePath();
+
+    const pinGrad = ctx.createLinearGradient(centerX - 14, pinCenterY - 14, centerX + 14, pinTipY);
+    pinGrad.addColorStop(0, "#fef08a");
+    pinGrad.addColorStop(0.5, "#eab308");
+    pinGrad.addColorStop(1, "#b45309");
+    ctx.fillStyle = pinGrad;
+    ctx.shadowBlur = 12;
+    ctx.shadowColor = "rgba(0, 0, 0, 0.4)";
+    ctx.fill();
+
+    ctx.strokeStyle = "#ffffff";
     ctx.lineWidth = 2;
     ctx.stroke();
 
+    // Red jewel in the center of the pin
     ctx.beginPath();
-    ctx.arc(centerX, centerY, 31, 0, 2 * Math.PI);
-    const innerHubGradient = ctx.createLinearGradient(centerX - 20, centerY - 20, centerX + 25, centerY + 25);
-    innerHubGradient.addColorStop(0, "#1e1b4b");
-    innerHubGradient.addColorStop(1, "#0f172a");
-    ctx.fillStyle = innerHubGradient;
-    ctx.shadowBlur = 0;
+    ctx.arc(centerX, pinCenterY, 5, 0, 2 * Math.PI);
+    ctx.fillStyle = "#dc2626";
     ctx.fill();
-
-    ctx.beginPath();
-    ctx.arc(centerX, centerY, 27, 0, 2 * Math.PI);
-    ctx.strokeStyle = "rgba(196, 181, 253, 0.85)";
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-
-    ctx.fillStyle = "#fef3c7";
-    ctx.shadowBlur = 10;
-    ctx.shadowColor = "#fbbf24";
-    ctx.font = "800 9px var(--font-sans)";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText("✦", centerX, centerY - 9);
-    ctx.fillStyle = "#ffffff";
-    ctx.shadowBlur = 0;
-    ctx.font = "800 8px var(--font-sans)";
-    ctx.fillText("QUAY", centerX, centerY + 7);
-    ctx.restore();
-
-    // 5. Draw Top Pointer Pin
-    ctx.save();
-    ctx.translate(centerX, centerY - radius - 2);
-    ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.lineTo(-15, -30);
-    ctx.lineTo(15, -30);
-    ctx.closePath();
-    ctx.fillStyle = "#f43f5e";
-    ctx.shadowBlur = 14;
-    ctx.shadowColor = "#f43f5e";
-    ctx.fill();
-
-    // Pointer border
-    ctx.strokeStyle = "#ffffff";
-    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = "#fef08a";
+    ctx.lineWidth = 1;
     ctx.stroke();
     ctx.restore();
-
   }, [angle, activeItems]);
 
   return (
-    <div 
-      className="wheel-canvas-container" 
+    <div
+      className="wheel-canvas-container"
       style={{
         position: "relative",
         width: "100%",
-        maxWidth: large ? "600px" : "420px",
+        maxWidth: large ? "560px" : "420px",
         aspectRatio: "1/1",
         margin: "0 auto",
       }}
     >
-      <div className="wheel-neon-orbit" aria-hidden="true" />
       <canvas
         ref={canvasRef}
         style={{

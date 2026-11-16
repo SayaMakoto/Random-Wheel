@@ -142,10 +142,12 @@ export default function AdminWheelsClient({ initialWheels }: AdminWheelsClientPr
                     </td>
                     <td style={{ padding: "0.75rem 1rem", display: "flex", gap: "0.4rem", justifyContent: "center" }}>
                       <Link 
-                        href={`/wheels/${wheel.id}`} 
+                        href={`/admin/wheels/${wheel.id}/view`} 
                         target="_blank"
+                        rel="noopener noreferrer"
                         className="btn btn-secondary" 
                         style={{ padding: "0.3rem 0.6rem", fontSize: "0.8rem", display: "flex", alignItems: "center", gap: "0.25rem" }}
+                        title="Xem chi tiết vòng quay ở phía Admin (Mở trong tab mới)"
                       >
                         <EyeIcon className="w-4 h-4" /> Xem
                       </Link>

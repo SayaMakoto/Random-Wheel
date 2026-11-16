@@ -15,7 +15,8 @@ import {
   TrashIcon, 
   KeyIcon, 
   AdjustmentsHorizontalIcon,
-  WheelIcon
+  WheelIcon,
+  EyeIcon
 } from "@/components/Icons";
 
 interface SerializedWheel {
@@ -131,9 +132,20 @@ export default function AdminWheelEditClient({ initialWheel }: AdminWheelEditCli
         <h2 style={{ fontSize: "1.5rem", fontWeight: "700", display: "flex", alignItems: "center", gap: "0.5rem" }}>
           <PencilIcon className="w-6 h-6" style={{ color: "#a78bfa" }} /> Thiết lập vòng quay: {initialWheel.name}
         </h2>
-        <Link href="/admin/wheels" className="btn btn-secondary" style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-          <ArrowLeftIcon className="w-5 h-5" /> Quay Lại
-        </Link>
+        <div style={{ display: "flex", gap: "0.5rem" }}>
+          <Link 
+            href={`/admin/wheels/${initialWheel.id}/view`} 
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn btn-primary" 
+            style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}
+          >
+            <EyeIcon className="w-5 h-5" /> Mở Chi Tiết Quay (Admin)
+          </Link>
+          <Link href="/admin/wheels" className="btn btn-secondary" style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <ArrowLeftIcon className="w-5 h-5" /> Quay Lại
+          </Link>
+        </div>
       </div>
 
       {message && <div className={`admin-toast ${message.success ? "admin-toast-success" : "admin-toast-error"}`} role={message.error ? "alert" : "status"}>

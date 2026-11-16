@@ -2,10 +2,10 @@ import React from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, getAdminUser } from "@/lib/auth";
 import WheelClientWrapper from "./WheelClientWrapper";
 import Header from "@/components/Header";
-import { WheelIcon, PencilIcon } from "@/components/Icons";
+import { parseSpinResult } from "@/lib/spin-history";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -15,12 +15,13 @@ export async function generateMetadata({ params }: PageProps) {
   const { id } = await params;
   const wheel = await db.wheel.findUnique({ where: { id } });
   return {
-    title: wheel ? `Vòng quay ${wheel.name} - Lucky Wheel Hub` : "Vòng quay - Lucky Wheel Hub"
+    title: wheel ? `Vòng quay ${wheel.name} - Lucky Wheel Hub` : "Vòng quay - Lucky Wheel Hub",
   };
 }
 
 export default async function WheelDetailPage({ params }: PageProps) {
   const { id } = await params;
+  const admin = await getAdminUser();
   const user = await getCurrentUser();
 
   // Fetch wheel config
@@ -28,9 +29,9 @@ export default async function WheelDetailPage({ params }: PageProps) {
     where: { id },
     include: {
       user: {
-        select: { username: true }
-      }
-    }
+        select: { username: true },
+      },
+    },
   });
 
   // If wheel doesn't exist or is soft-deleted, return 404
@@ -38,7 +39,22 @@ export default async function WheelDetailPage({ params }: PageProps) {
     notFound();
   }
 
-  const credit = user && user.role !== "admin" ? await db.spinCodeRedemption.aggregate({ where: { userId: user.id }, _sum: { remaining: true } }) : null;
+  const [credit, spinHistory] = await Promise.all([
+    user
+      ? db.spinCodeRedemption.aggregate({
+          where: { userId: user.id },
+          _sum: { remaining: true },
+        })
+      : null,
+    db.spinHistory.findMany({
+      where: { wheelId: id },
+      include: {
+        user: { select: { username: true } },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 20,
+    }),
+  ]);
 
   let parsedSlices = [];
   try {
@@ -47,25 +63,37 @@ export default async function WheelDetailPage({ params }: PageProps) {
     console.error("Failed to parse slices JSON:", e);
   }
 
-  const isOwnerOrAdmin = user && (user.id === wheel.userId || user.role === "admin");
+  const formattedHistory = spinHistory.map((s) => {
+    const d = new Date(s.createdAt);
+    const timeStr = `${d.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit", second: "2-digit" })} ${d.toLocaleDateString("vi-VN")}`;
+    const parsed = parseSpinResult(s.resultLabel, s.user?.username || "Khách");
+    return {
+      id: s.id,
+      participant: parsed.participant,
+      prize: parsed.prize,
+      time: timeStr,
+    };
+  });
 
   return (
     <div className="app-container wheel-detail-container">
       {/* Header breadcrumb */}
-      <Header user={user} />
+      <Header user={user || admin} />
 
-      {/* Main Wheel Client Container */}
-      <WheelClientWrapper 
+      {/* Main Wheel Client Container - strictly user view */}
+      <WheelClientWrapper
         wheelId={wheel.id}
         wheelName={wheel.name}
         creatorName={wheel.user.username}
         slices={parsedSlices}
         currentUser={user}
-        customWinnerId={wheel.customWinnerId}
+        customWinnerId="random"
         hideOnWin={wheel.hideOnWin}
         backgroundImage={wheel.backgroundImage}
         initialUpdatedAt={wheel.updatedAt.toISOString()}
         initialCredits={credit?._sum.remaining ?? 0}
+        initialHistory={formattedHistory}
+        isAdminView={false}
       />
     </div>
   );
